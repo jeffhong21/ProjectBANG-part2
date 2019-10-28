@@ -71,8 +71,8 @@ namespace JH.RootMotionController
 
         private float m_airTime;
         private float m_normalizedForwardSpeed;
-        private float m_noralizedLateralSpeed;
-        private float m_normalizedVerticalSpeed;
+        private float m_normalizedLateralSpeed;
+        private float m_normalizedTurnSpeed;
 
         private float m_stickyForce;
         private float m_maxSpeed = 1;
@@ -96,7 +96,9 @@ namespace JH.RootMotionController
 
         private void AnimatorMove()
         {
-            m_rigidbody.angularVelocity = Vector3.Lerp(m_rigidbody.angularVelocity, angularVelocity, rotationSpeed * m_deltaTime);
+            //m_rigidbody.angularVelocity = Vector3.Lerp(m_rigidbody.angularVelocity, angularVelocity, rotationSpeed * m_deltaTime);
+            m_rigidbody.MoveRotation(moveRotation);
+
             m_rigidbody.velocity = Vector3.Lerp(m_rigidbody.velocity, velocityVector, 20 * m_deltaTime);
         }
 
@@ -110,15 +112,18 @@ namespace JH.RootMotionController
             //inputDirection = m_targetRotation * localMoveDirection.normalized;
             inputDirection = Quaternion.Inverse(m_transform.rotation) * m_transform.TransformDirection(m_targetRotation * localMoveDirection.normalized);
 
-                
-            //moveDirection = m_transform.rotation * GetMovementVector();
-            //velocityVector += moveDirection;
-            localVelocity = m_transform.InverseTransformDirection(velocityVector);
+            m_targetAngle = m_transform.AngleFromForward(m_targetDirection);
+            m_angleFromForward = m_targetRotation.eulerAngles.y;
+            moveDirection = m_transform.rotation * GetMovementVector();
+            velocityVector += moveDirection;
 
-            velocityVector = GetMovementVector() / m_deltaTime;
-            velocityVector = m_targetRotation * m_verticalVelocity;
 
-            currentSpeed = velocityVector.magnitude;
+            //velocityVector = GetMovementVector() / m_deltaTime;
+            //velocityVector = m_targetRotation * m_verticalVelocity;
+            localVelocity = m_transform.InverseTransformDirection(velocityVector).normalized;
+
+
+            currentSpeed = localVelocity.magnitude;
             isMoving = m_inputMagnitude > m_motor.moveThreshold;
         }
 
@@ -199,22 +204,33 @@ namespace JH.RootMotionController
             //m_targetYRotation = Mathf.Lerp(0, m_targetAngle, rotationSpeed * m_deltaTime);
 
             //m_angleFromForward = m_transform.AngleFromForward(inputVector);
-            m_angleFromForward = Mathf.Atan2(inputVector.x, inputVector.z) * Mathf.Abs(inputVector.x);
-            m_targetAngle = MathUtil.ClampAngle(m_angleFromForward * m_motor.turningSpeed);
-            m_targetAngle = m_angleFromForward * m_motor.turningSpeed;
-            m_targetYRotation = Mathf.Lerp(0, m_angleFromForward * Mathf.Rad2Deg * rotationSpeed, rotationSpeed * m_deltaTime);
-            m_transformY = GetRotationAngle();
-            var targetRotation = angularVelocity;
-            targetRotation.y = m_targetYRotation;
-            angularVelocity = targetRotation;
 
-            if (isMoving) {
 
-                moveRotation = Quaternion.Euler(angularVelocity);
-            }
-            else {
+            Quaternion targetRotation = Quaternion.Euler(0, m_targetAngle * rotationSpeed * m_deltaTime, 0);
+            moveRotation = targetRotation * m_transform.rotation;
+            //if (isMoving) {
+            //    var turnAngle = Vector3.SignedAngle(m_transform.forward, m_targetDirection, up) * Mathf.Rad2Deg;
+            //    //m_targetYRotation = Mathf.Lerp(0, turnAngle * rotationSpeed, rotationSpeed * m_deltaTime);
 
-            }
+            //    m_targetYRotation = turnAngle ;
+            //    var rotation = angularVelocity;
+            //    rotation.y = m_targetYRotation;
+            //    angularVelocity = rotation;
+
+            //    Quaternion targetRotation = Quaternion.Euler(0, m_targetAngle * rotationSpeed * m_deltaTime, 0);
+            //    moveRotation = targetRotation;// * m_transform.rotation;
+            //}
+            //else {
+            //    var turnAngle = Mathf.Atan2(inputVector.x, inputVector.z) * Mathf.Abs(inputVector.x);
+            //    m_targetYRotation = Mathf.Lerp(0, turnAngle * rotationSpeed, rotationSpeed * m_deltaTime);
+            //    var rotation = angularVelocity;
+            //    rotation.y = m_targetYRotation;
+            //    angularVelocity = rotation;
+
+            //    //moveRotation = Quaternion.Euler(angularVelocity);
+            //}
+
+
         }
 
 
@@ -232,18 +248,33 @@ namespace JH.RootMotionController
         private void UpdateAnimator()
         {
             m_animator.SetBool("Moving", isMoving);
-            if (m_isRunning) m_maxSpeed = 2;
-            else m_maxSpeed = 1;
-            m_animator.SetFloat("ForwardInput", inputVector.z * m_maxSpeed, 0.1f, m_deltaTime);
-            m_animator.SetFloat("HorizontalInput", inputVector.x * m_maxSpeed, 0.1f, m_deltaTime);
+
+
+            SetTurningSpeed(m_transform.rotation, moveRotation);
+
+
+            m_normalizedForwardSpeed = Mathf.Lerp(m_normalizedForwardSpeed, inputVector.z, m_deltaTime);
+            m_normalizedLateralSpeed = Mathf.Lerp(m_normalizedLateralSpeed, inputVector.x, m_deltaTime);
+
+            m_normalizedForwardSpeed = Mathf.Approximately(inputVector.z, 0) ? 0 : inputVector.z;
+            m_normalizedLateralSpeed = Mathf.Approximately(inputVector.x, 0) ? 0 : inputVector.x;
+
+            m_animator.SetFloat("ForwardInput", m_normalizedForwardSpeed, 0.1f, m_deltaTime);
+            m_animator.SetFloat("HorizontalInput", m_normalizedLateralSpeed, 0.1f, m_deltaTime);
 
             //m_animator.SetFloat("ForwardInput", Mathf.Clamp((inputVector.z + localVelocity.z) * 0.5f, -1 * m_maxSpeed, m_maxSpeed));
             //m_animator.SetFloat("HorizontalInput", Mathf.Clamp(inputVector.x, -1 * m_maxSpeed, m_maxSpeed));
         }
 
 
+        private void SetTurningSpeed(Quaternion currentRotation, Quaternion newRotation)
+        {
+            float currentY = currentRotation.eulerAngles.y;
+            float newY = newRotation.eulerAngles.y;
+            float difference = (newY - currentY).Wrap() / m_deltaTime;
 
-
+            m_normalizedTurnSpeed = Mathf.Lerp(m_normalizedTurnSpeed, Mathf.Clamp(difference / rotationSpeed, -1, 1), m_deltaTime * rotationSpeed);
+        }
 
 
         public Vector3 GetMovementVector()
@@ -254,6 +285,7 @@ namespace JH.RootMotionController
 
         public float GetRotationAngle()
         {
+            //var angle = Quaternion.Angle()
             m_animator.deltaRotation.ToAngleAxis(out float rotationAngle, out Vector3 axis);
             return rotationAngle * m_motor.rootMotionScale;
         }

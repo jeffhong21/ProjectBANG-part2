@@ -41,8 +41,9 @@ namespace JH.RootMotionController
             m_rigidbody.isKinematic = m_advance.isKinematic;
             m_rigidbody.interpolation = m_advance.rigidbodyInterpolation;
             m_rigidbody.constraints = m_rigidbody.isKinematic ?
-                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ :
-                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ :
+                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY| RigidbodyConstraints.FreezeRotationZ;
+
             //  Collider settings.
             m_actorCollider.center = m_collider.center;
             m_actorCollider.height = m_collider.height;
