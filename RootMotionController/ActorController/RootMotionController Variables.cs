@@ -35,9 +35,21 @@ namespace JH.RootMotionController
         }
 
 
+        /// <summary>
+        /// Returns movement settings turning speed as radians.
+        /// </summary>
+        private float rotationSpeed { get => m_motor.turningSpeed * Mathf.Deg2Rad; }
+
+        public float colliderRadius
+        {
+            get { return m_actorCollider.radius * m_transform.lossyScale.x; }
+            set { m_actorCollider.radius = value * m_transform.lossyScale.x; }
+        }
+
+
         private float m_spherecastRadius = 0.1f;
 
-
+        public LayerMask collisionMask { get { return m_collision.collisionsMask; } }
 
 
         [Serializable]
@@ -47,6 +59,10 @@ namespace JH.RootMotionController
             /// Scaler multiplier added to root motion.
             /// </summary>
             public float rootMotionScale = 1;
+
+
+
+            public float maxSpeed = 10;
             /// <summary>
             /// The degrees per second that the character can turn.
             /// </summary>
@@ -83,6 +99,7 @@ namespace JH.RootMotionController
         [Serializable]
         private class AnimationSettings
         {
+           
             [Tooltip("The name of the state that should be activated when the character is moving.")]
             public string moveStateName = "Movement";
             [Tooltip("The name of the state that should be activated when the character is airborne.")]
@@ -103,7 +120,7 @@ namespace JH.RootMotionController
             public float maxStepHeight = 0.3f;
             [Tooltip("Use built in gravity or custom gravity.")]
             public bool useGravity;
-            [Tooltip("Gravity modifier."), Range(1, 4), Min(0)]
+            [Tooltip("Gravity modifier."), Range(0.01f, 4)]
             public float gravityModifier = 1f;
             [Tooltip("Maximum downward velocity the character can reach when falling.")]
             public float terminalVelocity = 10;
@@ -111,6 +128,7 @@ namespace JH.RootMotionController
             public float groundStickiness = 2f;
             [Tooltip("#NotYetImplemented")]
             public float airborneThreshold = 0.3f;
+
         }
 
 

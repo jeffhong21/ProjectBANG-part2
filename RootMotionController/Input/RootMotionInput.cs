@@ -211,7 +211,7 @@ namespace JH.RootMotionController.RootMotionInput
 
             m_controller.Move(moveInput.x, moveInput.y, m_lookRotation);
 
-            m_controller.m_isRunning = Input.GetKey(KeyCode.LeftShift);
+            //m_controller.m_isRunning = Input.GetKey(KeyCode.LeftShift);
         }
 
 
@@ -319,10 +319,9 @@ namespace JH.RootMotionController.RootMotionInput
 
         void OnAim(InputAction.CallbackContext context)
         {
+            Debug.Log("Aiming: " + context.ReadValueAsObject());
 
-
-            if (context.performed)
-                Debug.Log("Aiming: " + context.ReadValueAsObject());
+                
         }
     }
 }

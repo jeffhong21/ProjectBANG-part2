@@ -9,137 +9,212 @@ namespace JH.RootMotionController
 
     public partial class RootMotionController
     {
+        private LocomotionState locomotionState = LocomotionState.Standing;
 
         public bool isMoving;
         public bool isGrounded;
-        public Vector3 inputVector;// { get; private set; }
-
-        public Vector3 inputVectorRaw{
-            get {
-                var inputX = inputVector.x > 0 || inputVector.x < 0 ? Mathf.Sign(inputVector.x) * 1 : 0;
-                var inputZ = inputVector.z > 0 || inputVector.z < 0 ? Mathf.Sign(inputVector.z) * 1 : 0;
-                return new Vector3(inputX, 0, inputZ);
-            }
-        }
-
-        /// <summary>
-        /// Returns movement settings turning speed as radians.
-        /// </summary>
-        private float rotationSpeed { get => m_motor.turningSpeed * Mathf.Deg2Rad; }
-
-        public float colliderRadius {
-            get { return m_actorCollider.radius * m_transform.lossyScale.x; }
-            set { m_actorCollider.radius = value * m_transform.lossyScale.x; }
-        }
+        public bool isStrafing;
 
         [DebugDisplay(RichTextColor.Magenta)]
-        public float m_targetAngle;
+        public Vector3 inputVector;
+        /// <summary>Direction of input vector.e</summary>
         [DebugDisplay(RichTextColor.Magenta)]
-        public float m_targetYRotation;
-        [DebugDisplay(RichTextColor.Orange)]
-        public float m_angleFromForward;
-        [DebugDisplay(RichTextColor.Orange)]
-        public float m_transformY;
-
-        [DebugDisplay(RichTextColor.Blue)]
         public Vector3 inputDirection { get; private set; }
+
+
+
+        /// <summary>   </summary>
+        [DebugDisplay(RichTextColor.LightBlue)]
+        public Vector3 moveDirection;
+        /// <summary>   </summary>
         [DebugDisplay(RichTextColor.Orange)]
-        public Vector3 moveDirection { get; private set; }
+        public Quaternion moveRotation;
+        /// <summary>Difference from the Last Frame and the Current Frame.</summary>
+        [DebugDisplay(RichTextColor.Blue)]
+        public Vector3 deltaPosition; // { get; private set; }
+        /// <summary>World Position on the last Frame.</summary>
+        public Vector3 lastPosition { get; internal set; }
+        /// <summary>Difference between the Current Rotation and the desire Input Rotation. </summary>
+        [DebugDisplay]
+        public float deltaAngle { get; internal set; }
+        /// <summary>Total velocity of this frame.</summary>
         [DebugDisplay(RichTextColor.Green)]
         public Vector3 velocityVector { get; private set; }
-        [DebugDisplay(RichTextColor.DarkGreen)]
-        public Vector3 localVelocity { get; private set; }
+        [DebugDisplay(RichTextColor.Green)]
+        public float velocitySpeed { get; private set; }
         [DebugDisplay]
-        public float currentSpeed { get; private set; }
-        [DebugDisplay]
-        public Vector3 angularVelocity { get; private set; }
-        [DebugDisplay]
-        public Quaternion moveRotation { get; private set; }
+        public float maxMoveSpeed { get; private set; }
+
+        public bool moveWithDirection { get; private set; }
 
 
+
+        /// <summary>Normalized forward speed.</summary>
+        public float normalizedForwardSpeed { get; private set; }
+        /// <summary>Normalized forward speed.</summary>
+        public float normalizedLateralSpeed { get; private set; }
+        /// <summary>Normalized forward speed.</summary>
+        public float normalizedTurnSpeed { get; private set; }
 
         public GroundInfo groundInfo;
 
-        public LayerMask collisionMask { get { return m_collision.collisionsMask; } }
+        public Vector3 surfaceNormal;
 
-        private float m_groundAngle;
-        private Vector3 m_previousVelocity;
+        public float surfaceAngle { get; private set; }
+        /// <summary>Direction of ground.  Positive means going up, negative going down.</summary>
+        public float surfaceSlope { get; private set; }
+
+
+
+
         private Vector3 m_verticalVelocity;
         private Vector3 m_targetDirection;
         private Quaternion m_targetRotation;
         private float m_inputMagnitude;
 
         private float m_airTime;
-        private float m_normalizedForwardSpeed;
-        private float m_normalizedLateralSpeed;
-        private float m_normalizedTurnSpeed;
-
-        private float m_stickyForce;
-        private float m_maxSpeed = 1;
-        public bool m_isRunning;
 
 
 
 
-
-
+        public void SetLocomotionState(LocomotionState locomotion)
+        {
+            locomotionState = locomotion;
+        }
 
 
         public void Move(float horizontalInput, float forwardInput, Quaternion rotation)
         {
             inputVector.Set(horizontalInput, 0, forwardInput);
+            if (inputVector.sqrMagnitude > 1)
+                inputVector.Normalize();
+
+            if (inputVector.sqrMagnitude > 1) inputVector.Normalize();
 
             m_targetRotation = rotation;
-            m_targetDirection = rotation * forward;
+
+            if (isGrounded)
+                m_targetDirection = rotation * inputVector;
+            m_targetDirection = inputVector;
+            //m_targetDirection = rotation * forward;
+
+
+            ////  -- In default movement.
+            //moveWithDirection = true;
+            //isMoving = inputVector.z > m_motor.moveThreshold;
+
+
+
+            //if (isGrounded)
+            //    inputVector = Quaternion.FromToRotation(Vector3.up, surfaceNormal) * inputVector;
+            //m_targetDirection = inputVector;
+
+
+
+            //  Get deltaAngle.
+            deltaAngle = 0;
+            if (isMoving) {
+                //  Find the difference between the current angle and the target angle in radians.
+                var currentAngle = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
+                var targetAngle = Mathf.Atan2(m_targetDirection.x, m_targetDirection.z) * Mathf.Rad2Deg;
+                deltaAngle = Mathf.DeltaAngle(currentAngle, targetAngle);
+            }
+
+            //inputVector = m_transform.InverseTransformVector(inputVector);
+
+            float turnAmount = Mathf.Atan2(inputVector.x, inputVector.z);
+            float forwardAmount = Mathf.Abs(inputVector.z);
+
+            inputDirection.Set(turnAmount, 0, forwardAmount);
         }
 
 
-        private void AnimatorMove()
-        {
-            //m_rigidbody.angularVelocity = Vector3.Lerp(m_rigidbody.angularVelocity, angularVelocity, rotationSpeed * m_deltaTime);
-            m_rigidbody.MoveRotation(moveRotation);
 
-            m_rigidbody.velocity = Vector3.Lerp(m_rigidbody.velocity, velocityVector, 20 * m_deltaTime);
+
+
+
+
+        private void OnAnimatorMove()
+        {
+
+            bool animatePhysics = m_animator.updateMode == AnimatorUpdateMode.AnimatePhysics;
+            deltaTime = animatePhysics ? m_fixedDeltaTime : m_deltaTime;
+            deltaPosition = position - lastPosition;
+            lastPosition = m_transform.position;
+
+
+            ResetValues();
+
+            if (deltaTime > 0 && deltaPosition != Vector3.zero) {
+                velocityVector = deltaPosition / deltaTime;
+                velocitySpeed = Vector3.ProjectOnPlane(velocityVector, -gravity).magnitude;
+            }
+
+            isMoving = inputDirection.z > m_motor.moveThreshold;
+            locomotionState = isMoving ? LocomotionState.Walking : LocomotionState.Standing;
+            maxMoveSpeed = Mathf.MoveTowards(maxMoveSpeed, Mathf.Clamp((int)locomotionState, 1, 5), deltaTime * 4);
+
+            //  -----
+            SetMovement();
+
+
+
+            //  -----
+            CheckGround();
+
+            //  -----
+            CheckMovement();
+
+
+            //  -----
+            UpdateRotation();
+
+
+            //  -----
+            UpdateMovement();
+
+
+            //  -----
+            ApplyMovement();
+            //  -----
+            UpdateAnimator();
+
+
+
+
+            ////m_rigidbody.angularVelocity = Vector3.Lerp(m_rigidbody.angularVelocity, angularVelocity, rotationSpeed * deltaTime);
+            //m_rigidbody.MoveRotation(moveRotation);
+            //m_rigidbody.velocity = Vector3.Lerp(m_rigidbody.velocity, velocityVector, 20 * deltaTime);
         }
 
 
 
 
 
-        private void Move()
+        public void SetMovement()
         {
-            var localMoveDirection = new Vector3(inputVector.x, 0, inputVector.z);
-            //inputDirection = m_targetRotation * localMoveDirection.normalized;
-            inputDirection = Quaternion.Inverse(m_transform.rotation) * m_transform.TransformDirection(m_targetRotation * localMoveDirection.normalized);
+            //  -----
+            float forwardAcceleration = 3;
+            float lateralAcceleration = 4;
+            float maxForwardSpeed = maxMoveSpeed;
+            float maxLateralSpeed = 1;
 
-            m_targetAngle = m_transform.AngleFromForward(m_targetDirection);
-            m_angleFromForward = m_targetRotation.eulerAngles.y;
-            moveDirection = m_transform.rotation * GetMovementVector();
-            velocityVector += moveDirection;
+            normalizedForwardSpeed = Mathf.MoveTowards(normalizedForwardSpeed, inputVector.z * maxForwardSpeed, deltaTime * forwardAcceleration);
+            normalizedLateralSpeed = Mathf.MoveTowards(normalizedLateralSpeed, inputVector.x * maxLateralSpeed, deltaTime * lateralAcceleration);
 
-
-            //velocityVector = GetMovementVector() / m_deltaTime;
-            //velocityVector = m_targetRotation * m_verticalVelocity;
-            localVelocity = m_transform.InverseTransformDirection(velocityVector).normalized;
-
-
-            currentSpeed = localVelocity.magnitude;
-            isMoving = m_inputMagnitude > m_motor.moveThreshold;
+            normalizedForwardSpeed = Mathf.Approximately(normalizedForwardSpeed, 0) ? 0 : normalizedForwardSpeed;
+            normalizedLateralSpeed = Mathf.Approximately(normalizedLateralSpeed, 0) ? 0 : normalizedLateralSpeed;
         }
 
 
-        private void CheckGround()
-        {
 
+
+        private void CheckGround()  
+        {
             bool groundDetected = false;
             float radius = m_spherecastRadius;
             float distance = radius + m_physics.skinWidth;
-            RaycastHit groundHit = new RaycastHit
-            {
-                point = position,
-                normal = up
-            };
-
+            RaycastHit groundHit = new RaycastHit();
 
             if (isGrounded)
             {
@@ -167,24 +242,17 @@ namespace JH.RootMotionController
             }
 
 
-            groundInfo = new GroundInfo(groundHit);
+
             if (groundDetected)
             {
                 isGrounded = true;
-
-                m_groundAngle = Vector3.Angle(groundHit.normal, Vector3.up);
-                groundInfo.angle = m_groundAngle;
-                var verticalVelocity = Vector3.ProjectOnPlane(velocityVector, gravity);
-                float forwardSpeed = Vector3.Dot(verticalVelocity, Vector3.down);
-                m_stickyForce = groundInfo.distance * m_physics.groundStickiness * forwardSpeed;
-
-
+                surfaceAngle = Vector3.Angle(groundHit.normal, Vector3.up);
+                surfaceNormal = groundHit.normal;
             }
             else {
                 isGrounded = false;
-                m_groundAngle = 0;
-                groundInfo.angle = 0;
-                m_stickyForce = 0;
+                surfaceAngle = 0;
+
             }
 
         }
@@ -196,84 +264,93 @@ namespace JH.RootMotionController
 
         }
 
-
-        private void UpdateRotation()
-        {
-            //m_targetAngle = Vector3.SignedAngle(m_transform.forward, m_targetDirection, up);
-            //m_targetAngle = MathUtil.ClampAngle(m_targetAngle, 180);
-            //m_targetYRotation = Mathf.Lerp(0, m_targetAngle, rotationSpeed * m_deltaTime);
-
-            //m_angleFromForward = m_transform.AngleFromForward(inputVector);
-
-
-            Quaternion targetRotation = Quaternion.Euler(0, m_targetAngle * rotationSpeed * m_deltaTime, 0);
-            moveRotation = targetRotation * m_transform.rotation;
-            //if (isMoving) {
-            //    var turnAngle = Vector3.SignedAngle(m_transform.forward, m_targetDirection, up) * Mathf.Rad2Deg;
-            //    //m_targetYRotation = Mathf.Lerp(0, turnAngle * rotationSpeed, rotationSpeed * m_deltaTime);
-
-            //    m_targetYRotation = turnAngle ;
-            //    var rotation = angularVelocity;
-            //    rotation.y = m_targetYRotation;
-            //    angularVelocity = rotation;
-
-            //    Quaternion targetRotation = Quaternion.Euler(0, m_targetAngle * rotationSpeed * m_deltaTime, 0);
-            //    moveRotation = targetRotation;// * m_transform.rotation;
-            //}
-            //else {
-            //    var turnAngle = Mathf.Atan2(inputVector.x, inputVector.z) * Mathf.Abs(inputVector.x);
-            //    m_targetYRotation = Mathf.Lerp(0, turnAngle * rotationSpeed, rotationSpeed * m_deltaTime);
-            //    var rotation = angularVelocity;
-            //    rotation.y = m_targetYRotation;
-            //    angularVelocity = rotation;
-
-            //    //moveRotation = Quaternion.Euler(angularVelocity);
-            //}
-
-
-        }
-
-
         private void UpdateMovement()
         {
             if (isGrounded) {
 
             }
             else {
-                m_verticalVelocity += gravity * m_deltaTime;
+                //m_verticalVelocity += gravity * deltaTime;
             }
+        }
+
+
+        private void UpdateRotation()
+        {
+
+            //if (isMoving)
+            //{
+            //    if (!isStrafing){
+            //        Quaternion additiveRotation = Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(0, deltaAngle, 0),
+            //                                                        deltaTime * ((rotationSpeed + 1) / 4) * ((5 + 1) * 4));
+            //        moveRotation *= additiveRotation;
+            //    }
+            //    else {
+            //        //  -- If strafing.
+            //        var rotation = rotationSpeed * 10;
+            //        //Add +Rotation when going Forward and -Rotation when going backwards
+            //        var turnInput = Mathf.Clamp(normalizedLateralSpeed, -1, 1) * (inputVector.z >= 0 ? 1 : -1);  
+
+            //        moveRotation *= Quaternion.Euler(0, rotation * turnInput * deltaTime, 0);
+            //    }
+            //}
+
+            var targetAngle = m_transform.AngleFromForward(m_targetDirection);
+            Quaternion targetRotation = Quaternion.Euler(0,  targetAngle * rotationSpeed * deltaTime, 0);
+            moveRotation = targetRotation;
+
+
+        }
+
+
+
+        private void ApplyMovement()
+        {
+            if (!m_rigidbody.isKinematic) {
+                m_rigidbody.velocity = Vector3.zero;
+                m_rigidbody.angularVelocity = Vector3.zero;
+                if (deltaTime > 0) {
+                    m_rigidbody.velocity = velocityVector; // moveDirection / deltaTime;
+                }
+            }
+            //else {
+            //    m_rigidbody.position += moveDirection;
+            //}
+
+
+            //m_rigidbody.rotation *= moveRotation;
+            m_rigidbody.MoveRotation(moveRotation * m_transform.rotation);
         }
 
 
         private void UpdateAnimator()
         {
-            m_animator.SetBool("Moving", isMoving);
+            m_animator.SetBool(Hash.Moving, isMoving);
 
 
             SetTurningSpeed(m_transform.rotation, moveRotation);
 
 
-            m_normalizedForwardSpeed = Mathf.Lerp(m_normalizedForwardSpeed, inputVector.z, m_deltaTime);
-            m_normalizedLateralSpeed = Mathf.Lerp(m_normalizedLateralSpeed, inputVector.x, m_deltaTime);
 
-            m_normalizedForwardSpeed = Mathf.Approximately(inputVector.z, 0) ? 0 : inputVector.z;
-            m_normalizedLateralSpeed = Mathf.Approximately(inputVector.x, 0) ? 0 : inputVector.x;
+            m_animator.SetFloat(Hash.ForwardSpeed, normalizedForwardSpeed);
+            m_animator.SetFloat(Hash.LateralSpeed, normalizedLateralSpeed);
 
-            m_animator.SetFloat("ForwardInput", m_normalizedForwardSpeed, 0.1f, m_deltaTime);
-            m_animator.SetFloat("HorizontalInput", m_normalizedLateralSpeed, 0.1f, m_deltaTime);
 
-            //m_animator.SetFloat("ForwardInput", Mathf.Clamp((inputVector.z + localVelocity.z) * 0.5f, -1 * m_maxSpeed, m_maxSpeed));
-            //m_animator.SetFloat("HorizontalInput", Mathf.Clamp(inputVector.x, -1 * m_maxSpeed, m_maxSpeed));
         }
+
+
+
+
+
 
 
         private void SetTurningSpeed(Quaternion currentRotation, Quaternion newRotation)
         {
             float currentY = currentRotation.eulerAngles.y;
             float newY = newRotation.eulerAngles.y;
-            float difference = (newY - currentY).Wrap() / m_deltaTime;
+            float difference = (newY - currentY).Wrap() / deltaTime;
 
-            m_normalizedTurnSpeed = Mathf.Lerp(m_normalizedTurnSpeed, Mathf.Clamp(difference / rotationSpeed, -1, 1), m_deltaTime * rotationSpeed);
+            //m_normalizedTurnSpeed = Mathf.Lerp(m_normalizedTurnSpeed, Mathf.Clamp(difference / rotationSpeed, -1, 1), deltaTime * rotationSpeed);
         }
 
 
@@ -283,12 +360,12 @@ namespace JH.RootMotionController
             return moveVector;
         }
 
-        public float GetRotationAngle()
-        {
-            //var angle = Quaternion.Angle()
-            m_animator.deltaRotation.ToAngleAxis(out float rotationAngle, out Vector3 axis);
-            return rotationAngle * m_motor.rootMotionScale;
-        }
+        //public float GetRotationAngle()
+        //{
+        //    //var angle = Quaternion.Angle()
+        //    m_animator.deltaRotation.ToAngleAxis(out float rotationAngle, out Vector3 axis);
+        //    return rotationAngle * m_motor.rootMotionScale;
+        //}
 
 
 
@@ -309,64 +386,51 @@ namespace JH.RootMotionController
 
 
 
-
-
-
-
-        private void OnDrawGizmos()
+        private void ResetValues()
         {
-            if(Application.isPlaying)
-            {
-                if (debugMode.showMotionVectors)
-                {
-                    var drawHeight = 0.1f;
-                    var drawStep = 0.05f;
-                    var drawSubstep = 0.025f;
+            moveDirection = m_animator.deltaPosition;
+            moveRotation = m_animator.deltaRotation;
 
-                    DebugDrawer.DrawArrow(position.WithY(drawHeight), forward, debugMode.options.forwardDirectionColor, 1, debugMode.options.arrowTip, debugMode.options.arrowWidth);
-
-
-                    if (m_targetDirection != Vector3.zero) {
-                        DebugDrawer.DrawArrow(position.WithY(0.5f), m_targetDirection, debugMode.options.targetDirectionColor);
-                    }
-                    if (moveDirection != Vector3.zero) {
-                        DebugDrawer.DrawArrow(position.WithY(drawHeight + drawSubstep), Quaternion.Inverse(m_transform.rotation) * moveDirection, debugMode.options.moveDirectionColor);
-                    }
-
-                    if (inputDirection != Vector3.zero) {
-                        DebugDrawer.DrawArrow(position.WithY(drawHeight), m_transform.rotation * inputDirection, debugMode.options.inputDirectionColor);
-                    }
-
-                    if (velocityVector != Vector3.zero) {
-                        DebugDrawer.DrawArrow(position.WithY(drawHeight + (1 * drawStep)), velocityVector, debugMode.options.velocityColor);
-                    }
-                    if (m_rigidbody.velocity != Vector3.zero) {
-                        DebugDrawer.DrawArrow(position.WithY(drawHeight + (1 * drawStep) + drawSubstep),m_rigidbody.velocity,debugMode.options.velocityColor.Darker());
-                    }
-                }
-            }
-
+            surfaceNormal = Vector3.down;
         }
 
 
 
-        GUIStyle guiStyle = new GUIStyle();
-        Rect rect = new Rect();
-        private void OnGUI()
-        {
-            if (animator == null) return;
-            guiStyle.normal.textColor = Color.white;
-            guiStyle.fontStyle = FontStyle.Bold;
-            rect.width = Screen.width * 0.25f;
-            rect.x = (Screen.width * 0.5f) - (rect.width * 0.5f) + 18;
-            rect.y = (Screen.height * 0.5f) - (rect.height * 0.5f) - 18;
-            rect.height = 16 + rect.y;
-            GUI.Label(rect, "pivotWeight: " + animator.pivotWeight.ToString(), guiStyle);
-            rect.y += rect.height = 16;
-            rect.height += rect.height;
-            GUI.Label(rect, "feetPivotActive: " + animator.feetPivotActive.ToString(), guiStyle);
 
-
-        }
     }
 }
+
+
+
+
+
+
+
+
+
+////public void StrafeMovement()
+////{
+////    moveWithDirection = false;
+
+////    isMoving = inputVector.x > m_motor.moveThreshold || inputVector.z > m_motor.moveThreshold;
+
+////    moveDirection = inputVector;
+
+////    inputDirection = m_transform.TransformDirection(inputVector);
+////}
+
+//private void SetMovement()
+//{
+//    float forwardAcceleration = 3;
+//    float lateralAcceleration = 4;
+//    float maxForwardSpeed = maxMoveSpeed;
+//    float maxLateralSpeed = 1;
+
+//    normalizedForwardSpeed = Mathf.MoveTowards(normalizedForwardSpeed, inputVector.z * maxForwardSpeed, deltaTime * forwardAcceleration);
+//    normalizedLateralSpeed = Mathf.MoveTowards(normalizedLateralSpeed, inputVector.x * maxLateralSpeed, deltaTime * lateralAcceleration);
+
+//    //if (Mathf.Abs(normalizedForwardSpeed) < 0.001f) normalizedForwardSpeed = 0;
+//    //if (Mathf.Abs(normalizedLateralSpeed) < 0.001f) normalizedLateralSpeed = 0;
+//    normalizedForwardSpeed = Mathf.Approximately(normalizedForwardSpeed, 0) ? 0 : normalizedForwardSpeed;
+//    normalizedLateralSpeed = Mathf.Approximately(normalizedLateralSpeed, 0) ? 0 : normalizedLateralSpeed;
+//}

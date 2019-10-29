@@ -12,43 +12,72 @@ namespace JH.RootMotionController.RootMotionInput
     public class InputActionData : ScriptableObject
 	{
 
-        public PlayerInputAction MovementAction;
+        public PlayerInputAction MoveInput;
 
-        public PlayerInputAction LookAction;
+        public PlayerInputAction LookInput;
 
-        public PlayerInputAction AimAction;
+        public PlayerInputAction AimInput;
 
-        public PlayerInputAction CrouchAction;
+        public PlayerInputAction CrouchInput;
 
-        public PlayerInputAction DrawWeaponAction;
+        public PlayerInputAction NextWeaponInput;
 
-        public PlayerInputAction HolsterWeaponAction;
+        public PlayerInputAction PreviousWeaponInput;
 
 
 
-        private List<PlayerInputAction> m_playerInputActions = new List<PlayerInputAction>();
+        private List<PlayerInputAction> m_playerInputActions;
 
-        private Dictionary<InputAction, RootMotionAction> m_playerInputActionMap;
+
 
 
         private void Awake()
         {
-            m_playerInputActionMap = new Dictionary<InputAction, RootMotionAction>();
 
+
+            m_playerInputActions = new List<PlayerInputAction>()
+            {
+                MoveInput,
+                LookInput,
+                AimInput,
+                CrouchInput,
+                NextWeaponInput,
+                PreviousWeaponInput
+            };
         }
 
         private void OnEnable()
         {
+            for (int i = 0; i < m_playerInputActions.Count; i++)
+            {
+                var playerInputAction = m_playerInputActions[i];
+                playerInputAction.inputAction.started += ctx =>
+                {
+
+                };
+                playerInputAction.inputAction.performed += ctx =>
+                {
+
+                };
+                playerInputAction.inputAction.canceled += ctx =>
+                {
+
+                };
+                playerInputAction.inputAction.Enable();
+            }
 
         }
 
         private void OnDisable()
         {
-
+            for (int i = 0; i < m_playerInputActions.Count; i++) {
+                var playerInputAction = m_playerInputActions[i];
+                playerInputAction.inputAction.Disable();
+            }
         }
 
 
-        public void NewPlayerInputAction()
+        public void AddPlayerInputAction()
         {
 
         }

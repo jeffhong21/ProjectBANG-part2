@@ -64,10 +64,10 @@ MonoBehaviour:
     rootMotionAction: {fileID: 0}
   HolsterWeaponAction:
     inputAction:
-      m_Name: 
+      m_Name: Input
       m_Type: 0
       m_ExpectedControlType: 
-      m_Id: 
+      m_Id: 8237cffb-a7cd-4c62-b859-bdf5050e6c12
       m_Processors: 
       m_Interactions: 
       m_SingletonActionBindings: []
