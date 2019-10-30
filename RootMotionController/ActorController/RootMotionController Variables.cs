@@ -61,6 +61,9 @@ namespace JH.RootMotionController
             public float rootMotionScale = 1;
 
 
+            public float forwardAcceleration = 4;
+
+            public float lateralAcceleration = 4;
 
             public float maxSpeed = 10;
             /// <summary>

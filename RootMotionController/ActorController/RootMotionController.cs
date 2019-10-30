@@ -43,7 +43,7 @@ namespace JH.RootMotionController
             m_rigidbody.interpolation = m_advance.rigidbodyInterpolation;
             m_rigidbody.constraints = m_rigidbody.isKinematic ?
                                       RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ :
-                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY| RigidbodyConstraints.FreezeRotationZ;
+                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY|    RigidbodyConstraints.FreezeRotationZ;
 
             //  Collider settings.
             m_actorCollider.center = m_collider.center;
@@ -120,8 +120,8 @@ namespace JH.RootMotionController
                         DebugDrawer.DrawArrow(position.WithY(drawHeight + drawSubstep), Quaternion.Inverse(m_transform.rotation) * moveDirection, debugMode.options.moveDirectionColor);
                     }
 
-                    if (inputDirection != Vector3.zero) {
-                        DebugDrawer.DrawArrow(position.WithY(drawHeight), m_transform.rotation * inputDirection, debugMode.options.inputDirectionColor);
+                    if (inputVector != Vector3.zero) {
+                        DebugDrawer.DrawArrow(position.WithY(drawHeight), m_transform.rotation * inputVector, debugMode.options.inputDirectionColor);
                     }
 
                     if (velocityVector != Vector3.zero) {

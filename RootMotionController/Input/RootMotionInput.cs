@@ -10,8 +10,11 @@ namespace JH.RootMotionController.RootMotionInput
     using RootMotionUI;
 
 
-    public class RootMotionInput : MonoBehaviour //, StandardPlayerControls.IStandardControlsActions
+    public class RootMotionInput : MonoBehaviour 
     {
+        [Tooltip("Input Action Map asset for mouse/keyboard and game pad inputs")]
+        [SerializeField] private PlayerControlMap PlayerInputControls;
+
         private const string k_mouseXInputName = "Mouse X";
         private const string k_mouseYInputName = "Mouse Y";
         private const string k_mouseScrollInput = "Mouse ScrollWheel";
@@ -20,27 +23,24 @@ namespace JH.RootMotionController.RootMotionInput
         public event Action recenterCamera;
 
 
-        [Header("Input Settings")]
+
         [Range(0.2f, 2f), Tooltip(" ")]
         [SerializeField] private float verticalLookSensitivity;
         [Range(0.2f, 2f), Tooltip(" ")]
         [SerializeField] private float horizontalLookSensitivity;
-        [Tooltip("Input Action Map asset for mouse/keyboard and game pad inputs")]
-        [SerializeField] private StandardPlayerControls m_standardControls;
         [Tooltip(" ")]
         [SerializeField] private bool m_cursorLocked = true;
 
-        [Header("Camera Target")]
-        [Tooltip(" ")]
-        [SerializeField] private Transform m_camera;
-        [Tooltip(" ")]
-        [SerializeField] private Transform m_vcamTarget;
-        [Tooltip(" ")]
-        [SerializeField] private Transform m_lookTarget;
+        [Header("Input Action Settings")]
+        [SerializeField] private InputActionData inputActionData;
 
 
 
 
+
+        private Transform m_camera;
+        private Transform m_vcamTarget;
+        private Transform m_lookTarget;
         [Header("Input Displays")]
         [SerializeField, DisplayOnly]
         private Vector2 m_moveInput;
@@ -49,7 +49,8 @@ namespace JH.RootMotionController.RootMotionInput
         private Vector3 m_lookDirection;
         private Quaternion m_lookRotation;
         private Vector3 m_lookVelocity;  //  Used for lookTargets position SmoothDamp
-
+        private int lookInputProcessedFrame;
+        private bool hasProcessedLookInput;
 
 
         private Ray m_lookRay;
@@ -91,7 +92,7 @@ namespace JH.RootMotionController.RootMotionInput
         {
             m_controller = GetComponent<RootMotionController>();
             m_transform = transform;
-            m_standardControls = new StandardPlayerControls();
+            PlayerInputControls = new PlayerControlMap();
 
         }
 
@@ -99,23 +100,18 @@ namespace JH.RootMotionController.RootMotionInput
         private void OnEnable()
         {
             CinemachineCore.GetInputAxis += GetInputAxisOverride;
-            if (m_standardControls != null) {
-                m_standardControls.standardControls.move.performed += OnMoveInput;
-                m_standardControls.standardControls.mouseLook.performed += OnMouseLookInput;
+            PlayerInputControls.MovementActionMap.MoveAction.performed += OnMoveInput;
+            PlayerInputControls.MovementActionMap.MouseLookAction.performed += OnMouseLookInput;
+            PlayerInputControls.MovementActionMap.MoveAction.canceled += OnMoveInputCanceled;
 
-                m_standardControls.standardControls.aim.started += OnAim;
-                m_standardControls.standardControls.aim.performed += OnAim;
+            PlayerInputControls.MovementActionMap.Crouch.performed += ctx => { inputActionData.CROUCHING = !inputActionData.CROUCHING; };
+            PlayerInputControls.MovementActionMap.RunAction.performed += ctx => { };
+            PlayerInputControls.MovementActionMap.AimAction.performed += ctx => { inputActionData.AIMING = !inputActionData.AIMING; };
+            PlayerInputControls.MovementActionMap.UseAction.performed += ctx => {  };
+            PlayerInputControls.MovementActionMap.DrawHolsterAction.performed += ctx => { Debug.Log($"{ctx.action} was performed AT {ctx.startTime}"); };
 
-                m_standardControls.standardControls.crouch.started += OnCrouch;
-                m_standardControls.standardControls.crouch.performed += OnCrouch;
+            PlayerInputControls.Enable();
 
-
-
-                m_standardControls.standardControls.move.canceled += OnMoveInputCanceled;
-                m_standardControls.standardControls.crouch.canceled += OnCrouch;
-
-                m_standardControls.Enable();
-            }
             HandleCursorLock();
         }
 
@@ -123,22 +119,11 @@ namespace JH.RootMotionController.RootMotionInput
         private void OnDisable()
         {
             CinemachineCore.GetInputAxis -= GetInputAxisOverride;
+            PlayerInputControls.MovementActionMap.MoveAction.performed -= OnMoveInput;
+            PlayerInputControls.MovementActionMap.MouseLookAction.performed -= OnMouseLookInput;
+            PlayerInputControls.MovementActionMap.MoveAction.canceled -= OnMoveInputCanceled;
 
-            if (m_standardControls != null) {
-                m_standardControls.standardControls.move.performed -= OnMoveInput;
-                m_standardControls.standardControls.mouseLook.performed -= OnMouseLookInput;
-
-                m_standardControls.standardControls.aim.started -= OnAim;
-                m_standardControls.standardControls.aim.performed -= OnAim;
-
-                m_standardControls.standardControls.crouch.started -= OnCrouch;
-                m_standardControls.standardControls.crouch.performed -= OnCrouch;
-
-                m_standardControls.standardControls.move.canceled -= OnMoveInputCanceled;
-                m_standardControls.standardControls.crouch.canceled -= OnCrouch;
-                
-                m_standardControls.Disable();
-            }
+            PlayerInputControls.Disable();
         }
 
 
@@ -257,8 +242,7 @@ namespace JH.RootMotionController.RootMotionInput
         }
 
 
-        private int lookInputProcessedFrame;
-        private bool hasProcessedLookInput;
+
         private float GetInputAxisOverride(string axis)
         {
             var currentFrame = Time.frameCount;
@@ -277,7 +261,6 @@ namespace JH.RootMotionController.RootMotionInput
             }
 
             return 0;
-            //return Input.GetAxis(axis);
         }
 
 
@@ -325,3 +308,59 @@ namespace JH.RootMotionController.RootMotionInput
         }
     }
 }
+
+
+
+//private void OnEnable()
+//{
+//    CinemachineCore.GetInputAxis += GetInputAxisOverride;
+
+//    if (inputActionData != null) {
+//        inputActionData.Enable();
+//    }
+
+
+//    if (m_standardControls != null) {
+//        m_standardControls.standardControls.move.performed += OnMoveInput;
+//        m_standardControls.standardControls.mouseLook.performed += OnMouseLookInput;
+
+//        m_standardControls.standardControls.aim.started += OnAim;
+//        m_standardControls.standardControls.aim.performed += OnAim;
+
+//        m_standardControls.standardControls.crouch.started += OnCrouch;
+//        m_standardControls.standardControls.crouch.performed += OnCrouch;
+
+
+
+//        m_standardControls.standardControls.move.canceled += OnMoveInputCanceled;
+//        m_standardControls.standardControls.crouch.canceled += OnCrouch;
+
+//        m_standardControls.Enable();
+//    }
+//    HandleCursorLock();
+//}
+
+
+//private void OnDisable()
+//{
+//    CinemachineCore.GetInputAxis -= GetInputAxisOverride;
+//    if (inputActionData != null) {
+//        inputActionData.Disable();
+//    }
+
+//    if (m_standardControls != null) {
+//        m_standardControls.standardControls.move.performed -= OnMoveInput;
+//        m_standardControls.standardControls.mouseLook.performed -= OnMouseLookInput;
+
+//        m_standardControls.standardControls.aim.started -= OnAim;
+//        m_standardControls.standardControls.aim.performed -= OnAim;
+
+//        m_standardControls.standardControls.crouch.started -= OnCrouch;
+//        m_standardControls.standardControls.crouch.performed -= OnCrouch;
+
+//        m_standardControls.standardControls.move.canceled -= OnMoveInputCanceled;
+//        m_standardControls.standardControls.crouch.canceled -= OnCrouch;
+
+//        m_standardControls.Disable();
+//    }
+//}

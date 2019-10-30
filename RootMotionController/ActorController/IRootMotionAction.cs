@@ -8,6 +8,7 @@ namespace JH.RootMotionController.RootMotionActions
     public interface IRootMotionAction
     {
         bool isActive { get; }
+
         int priority {get; }
 
         bool TryStartAction();
@@ -24,6 +25,12 @@ namespace JH.RootMotionController.RootMotionActions
 
 
 
+
+    }
+
+
+    public interface IRootMotionStateAction
+    {
         void Update();
 
         void UpdateRotation();
@@ -33,14 +40,11 @@ namespace JH.RootMotionController.RootMotionActions
         void UpdateAnimator();
     }
 
-
-    public interface IRootMotionStateAction
-    {
-
-    }
-
     public interface IRootMotionItemAction
     {
+
+        GameObject item { get; set; }
+
 
     }
 }

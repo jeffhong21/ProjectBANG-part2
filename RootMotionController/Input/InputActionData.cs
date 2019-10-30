@@ -8,21 +8,28 @@ namespace JH.RootMotionController.RootMotionInput
 {
     using RootMotionActions;
 
-    public enum InputActionType { Pressed, PressAndRelease, Hold, Toggle }
+
 
 
     [CreateAssetMenu(fileName = "InputAction Data", menuName = "-- RootMotion Controller --/InputAction Data", order = -1000)]
     public class InputActionData : ScriptableObject
 	{
 
-        public InputActionMap gameplayActions;
 
-        public PlayerInputAction moveAction;
-        public PlayerInputAction lookAction;
-        public PlayerInputAction aimAction;
-        public PlayerInputAction crouchAction;
-        public PlayerInputAction NextWeaponInput;
-        public PlayerInputAction PreviousWeaponInput;
+        public bool CROUCHING;
+
+        public bool AIMING;
+
+
+
+        //public InputActionMap GameplayMoveActionMap = new InputActionMap("GameplayMoveActionMap");
+
+        //public PlayerInputAction MoveAction;
+        //public PlayerInputAction LookAction;
+        //public PlayerInputAction AimAction;
+        //public PlayerInputAction CrouchAction;
+        //public PlayerInputAction DrawHolsterSideArm;
+        //public PlayerInputAction DrawHolsterLongArm;
 
 
 
@@ -33,132 +40,132 @@ namespace JH.RootMotionController.RootMotionInput
 
         private void Awake()
         {
-            m_playerInputActions = new List<PlayerInputAction>()
-            {
-                MoveInput,
-                LookInput,
-                AimInput,
-                CrouchInput,
-                NextWeaponInput,
-                PreviousWeaponInput
-            };
+            //f(GameplayMoveActionMap == null) GameplayMoveActionMap = new InputActionMap("GameplayMoveActionMap");
+            
+
+            //m_playerInputActions = new List<PlayerInputAction>()
+            //{
+            //    MoveAction, LookAction, AimAction, CrouchAction,
+            //    DrawHolsterSideArm, DrawHolsterLongArm
+            //};
+
+            //for (int i = 0; i < m_playerInputActions.Count; i++) {
+            //    var playerInputAction = m_playerInputActions[i];
+            //    if(playerInputAction.inputAction != null)
+            //        GameplayMoveActionMap.AddAction(playerInputAction.inputAction.name);
+            //}
         }
 
-        private void OnEnable()
+        public void Enable()
         {
-            for (int i = 0; i < m_playerInputActions.Count; i++)
-            {
-                var playerInputAction = m_playerInputActions[i];
-                playerInputAction.inputAction.started += ctx =>
-                {
-
-                };
-                playerInputAction.inputAction.performed += ctx =>
-                {
-
-                };
-                playerInputAction.inputAction.canceled += ctx =>
-                {
-
-                };
-                playerInputAction.inputAction.Enable();
-            }
+            //for (int i = 0; i < m_playerInputActions.Count; i++)
+            //{
+            //    var playerInputAction = m_playerInputActions[i];
+            //    if (playerInputAction.inputAction != null)
+            //        playerInputAction.inputAction.Enable();
+            //}
 
         }
 
-        private void OnDisable()
+        public void Disable()
         {
-            for (int i = 0; i < m_playerInputActions.Count; i++) {
-                var playerInputAction = m_playerInputActions[i];
-                playerInputAction.inputAction.Disable();
-            }
+            //for (int i = 0; i < m_playerInputActions.Count; i++) {
+            //    var playerInputAction = m_playerInputActions[i];
+            //    if (playerInputAction.inputAction != null)
+            //        playerInputAction.inputAction.Disable();
+            //}
         }
 
 
-        public void AddPlayerInputAction()
-        {
 
-        }
 
 
 
         [Serializable]
         public class PlayerInputAction
         {
-
-            public InputAction inputAction;
+            [SerializeField]
+            private string m_inputActionName;
             [SerializeField]
             private RootMotionAction m_rootMotionAction;
             [SerializeField]
-            private InputActionType m_inputActionType = InputActionStartType.PressAndRelease;
+            private InputActionType m_inputActionType = InputActionType.PressAndRelease;
 
 
+            public string inputActionName { get; set; }
 
-            public int id { get{ return inputAction != null ? inputAction.id : -1; }}
-            public IRootMotionAction rootMotionAction {
-                get{ return m_rootMotionAction = null ? null : (IRootMotionAction)m_rootMotionAction;}
+            public IRootMotionAction rootMotionAction{
+                get { return m_rootMotionAction == null ? null : m_rootMotionAction; }
             }
-            public InputActionType inputActionType {get => m_inputActionType;}
+
+            public InputActionType inputActionType {
+                get => m_inputActionType;
+            }
 
 
 
-            public void Enable()
+
+
+
+            public InputAction CreateInputAction(string inputActionName)
             {
-                switch(inputActionType)
-                {
-                    case InputActionType.Pressed:
-
-                        break;
-                    case InputActionType.PressAndRelease:
-                        inputAction.performed += ctx => { rootMotionAction.TryStartAction(); };
-                        break;
-                    case InputActionType.Hold:
-
-                        break;
-                    case InputActionType.Toggle:
-
-                        break;
-                }
-
-                inputAction.Enable();
-            }
+                InputAction inputAction = new InputAction(inputActionName);
 
 
-            public void Disable()
-            {
-                inputAction.started += ctx =>
-                {
-
-                };
-                inputAction.performed += ctx =>
-                {
-
-                };
-                inputAction.canceled += ctx =>
-                {
-
-                };
+                return inputAction;
             }
 
 
 
-            public PlayerInputAction(InputAction playerInputAction)
-            {
-                inputAction = playerInputAction;
-                rootMotionAction = null;
-            }
+            //public void Enable()
+            //{
+            //    switch(inputActionType)
+            //    {
+            //        case InputActionType.Pressed:
 
-            public PlayerInputAction(RootMotionAction playerRootMotionAction)
-            {
-                inputAction = new InputAction();
-                rootMotionAction = playerRootMotionAction;
-            }
+            //            break;
+            //        case InputActionType.PressAndRelease:
+            //            inputAction.performed += ctx => { rootMotionAction.TryStartAction(); };
+            //            break;
+            //        case InputActionType.Hold:
 
-            public PlayerInputAction(InputAction playerInputAction, RootMotionAction playerRootMotionAction)
-            {
-                inputAction = playerInputAction;
-                rootMotionAction = playerRootMotionAction;
-            }
+            //            break;
+            //        case InputActionType.Toggle:
+
+            //            break;
+            //    }
+
+            //    inputAction.Enable();
+            //}
+
+
+            //public void Disable()
+            //{
+            //    inputAction.Disable();
+            //}
+
+
+
+            //public PlayerInputAction(InputAction playerInputAction)
+            //{
+            //    inputAction = playerInputAction;
+            //    m_rootMotionAction = null;
+            //}
+
+            //public PlayerInputAction(RootMotionAction playerRootMotionAction)
+            //{
+            //    inputAction = new InputAction();
+            //    m_rootMotionAction = playerRootMotionAction;
+            //}
+
+            //public PlayerInputAction(InputAction playerInputAction, RootMotionAction playerRootMotionAction)
+            //{
+            //    inputAction = playerInputAction;
+            //    m_rootMotionAction = playerRootMotionAction;
+            //}
         }
+
+
+        public enum InputActionType { Pressed, PressAndRelease, Hold, Toggle }
     }
 }
