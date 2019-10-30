@@ -8,33 +8,31 @@ namespace JH.RootMotionController.RootMotionInput
 {
     using RootMotionActions;
 
+    public enum InputActionType { Pressed, PressAndRelease, Hold, Toggle }
+
+
     [CreateAssetMenu(fileName = "InputAction Data", menuName = "-- RootMotion Controller --/InputAction Data", order = -1000)]
     public class InputActionData : ScriptableObject
 	{
 
-        public PlayerInputAction MoveInput;
+        public InputActionMap gameplayActions;
 
-        public PlayerInputAction LookInput;
-
-        public PlayerInputAction AimInput;
-
-        public PlayerInputAction CrouchInput;
-
+        public PlayerInputAction moveAction;
+        public PlayerInputAction lookAction;
+        public PlayerInputAction aimAction;
+        public PlayerInputAction crouchAction;
         public PlayerInputAction NextWeaponInput;
-
         public PlayerInputAction PreviousWeaponInput;
 
 
 
         private List<PlayerInputAction> m_playerInputActions;
-
+        
 
 
 
         private void Awake()
         {
-
-
             m_playerInputActions = new List<PlayerInputAction>()
             {
                 MoveInput,
@@ -87,9 +85,80 @@ namespace JH.RootMotionController.RootMotionInput
         [Serializable]
         public class PlayerInputAction
         {
-            public InputAction inputAction;
-            public RootMotionAction rootMotionAction;
 
+            public InputAction inputAction;
+            [SerializeField]
+            private RootMotionAction m_rootMotionAction;
+            [SerializeField]
+            private InputActionType m_inputActionType = InputActionStartType.PressAndRelease;
+
+
+
+            public int id { get{ return inputAction != null ? inputAction.id : -1; }}
+            public IRootMotionAction rootMotionAction {
+                get{ return m_rootMotionAction = null ? null : (IRootMotionAction)m_rootMotionAction;}
+            }
+            public InputActionType inputActionType {get => m_inputActionType;}
+
+
+
+            public void Enable()
+            {
+                switch(inputActionType)
+                {
+                    case InputActionType.Pressed:
+
+                        break;
+                    case InputActionType.PressAndRelease:
+                        inputAction.performed += ctx => { rootMotionAction.TryStartAction(); };
+                        break;
+                    case InputActionType.Hold:
+
+                        break;
+                    case InputActionType.Toggle:
+
+                        break;
+                }
+
+                inputAction.Enable();
+            }
+
+
+            public void Disable()
+            {
+                inputAction.started += ctx =>
+                {
+
+                };
+                inputAction.performed += ctx =>
+                {
+
+                };
+                inputAction.canceled += ctx =>
+                {
+
+                };
+            }
+
+
+
+            public PlayerInputAction(InputAction playerInputAction)
+            {
+                inputAction = playerInputAction;
+                rootMotionAction = null;
+            }
+
+            public PlayerInputAction(RootMotionAction playerRootMotionAction)
+            {
+                inputAction = new InputAction();
+                rootMotionAction = playerRootMotionAction;
+            }
+
+            public PlayerInputAction(InputAction playerInputAction, RootMotionAction playerRootMotionAction)
+            {
+                inputAction = playerInputAction;
+                rootMotionAction = playerRootMotionAction;
+            }
         }
     }
 }

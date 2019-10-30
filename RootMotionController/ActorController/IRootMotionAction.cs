@@ -7,6 +7,12 @@ namespace JH.RootMotionController.RootMotionActions
 {
     public interface IRootMotionAction
     {
+        bool isActive { get; }
+        int priority {get; }
+
+        bool TryStartAction();
+
+        bool TryStopAction();
 
         bool CanStartAction();
 
@@ -16,9 +22,7 @@ namespace JH.RootMotionController.RootMotionActions
 
         void StopAction(bool force = false);
 
-        void ActionStarted();
 
-        void ActionStopped();
 
         void Update();
 
