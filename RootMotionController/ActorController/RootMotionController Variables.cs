@@ -7,93 +7,54 @@ namespace JH.RootMotionController
 
     public partial class RootMotionController
     {
-        private const float k_collisionOffset = 0.01f;
-        private readonly float k_wallAngle = 85f;
-        private readonly float k_gravity = -9.81f;
 
-        [Tooltip("Movement settings.")]
-        [SerializeField] private MovementSettings m_motor = new MovementSettings();
-        [Tooltip("Animation settings.")]
-        [SerializeField] private AnimationSettings m_anim = new AnimationSettings();
-        [Tooltip("Physics settings.")]
-        [SerializeField] private PhysicsSettings m_physics = new PhysicsSettings();
-        [Tooltip("Collision settings.")]
-        [SerializeField] private CollisionSettings m_collision = new CollisionSettings();
-        [Tooltip("Advanced settings.")]
-        [SerializeField] private AdvanceSettings m_advance = new AdvanceSettings();
-        [Tooltip("Debug settings.")]
-        [SerializeField] public DebugSettings debugMode = new DebugSettings();
-
-        private CollisionSettings.ColliderSettings m_collider { get { return m_collision.colliderSettings; } }
-
-        private Vector3 _gravity;
-        public Vector3 gravity {
-            get {
-                _gravity.Set(0, k_gravity * m_physics.gravityModifier, 0);
-                return _gravity;
-            }
-        }
+        public Vector3 position { get => m_transform.position; }
+        public Vector3 forward { get => m_transform.forward; }
+        public Vector3 up { get => m_transform.up; }
+        public Vector3 down { get => -m_transform.up; }
 
 
-        /// <summary>
-        /// Returns movement settings turning speed as radians.
-        /// </summary>
-        private float rotationSpeed { get => m_motor.turningSpeed * Mathf.Deg2Rad; }
-
-        public float colliderRadius
-        {
-            get { return m_actorCollider.radius * m_transform.lossyScale.x; }
-            set { m_actorCollider.radius = value * m_transform.lossyScale.x; }
-        }
-
-
-        private float m_spherecastRadius = 0.1f;
-
-        public LayerMask collisionMask { get { return m_collision.collisionsMask; } }
 
 
         [Serializable]
         private class MovementSettings
         {
-            /// <summary>
-            /// Scaler multiplier added to root motion.
-            /// </summary>
+            /// <summary> Scaler multiplier added to root motion.</summary>
+            [Tooltip("Scaler multiplier added to root motion.")]
             public float rootMotionScale = 1;
 
-
-            public float forwardAcceleration = 4;
-
-            public float lateralAcceleration = 4;
-
+            //  -----  Movement Options  -----
+            /// <summary> #NOSUMMARY</summary>
+            [Tooltip("#NOTOOLTIP")]
+            public float forwardAcceleration = 0.2F;
+            /// <summary> #NOSUMMARY</summary>
+            [Tooltip("#NOTOOLTIP")]
+            public float lateralAcceleration = 0.28F;
+            /// <summary> #NOSUMMARY</summary>
+            [Tooltip("#NOTOOLTIP")]
+            public float moveDamping = 0.28F;
+            /// <summary>#NOSUMMARY</summary>
+            [Tooltip("#NOTOOLTIP")]
             public float maxSpeed = 10;
-            /// <summary>
-            /// The degrees per second that the character can turn.
-            /// </summary>
+
+            //  -----  Rotation Options  -----
+            /// <summary>   </summary>
             [Tooltip("The degrees per second that the character can turn.")]
             public float turningSpeed = 300f;
-            /// <summary>
-            /// Actor turn speed.
-            /// </summary>
-            [Tooltip("Actor turn speed."), Min(0)]
-            public float standingTurnSpeed = 0.25f;
-            /// <summary>
-            /// The minimum angle required to trigger a turnaround while the actor is moving.
-            /// </summary>
-            [Tooltip("The minimum angle required to trigger a turnaround while the actor is moving.")]
-            public float turnAroundAngle = 160f;
-            /// <summary>
-            /// The minimum angle required to trigger a turnaround while the actor is stationary.
-            /// </summary>
-            [Tooltip("The minimum angle required to trigger a turnaround while the actor is stationary.")]
-            public float standingTurnAroundAngle = 89f;
-            /// <summary>
-            /// Multiplier to ground speed when moving backwards.
-            /// </summary>
+            /// <summary> Actor turn speed.  </summary>
+            [Tooltip("Turn speed scale while not moving."), Min(0)]
+            public float standingTurnSpeedScale = 0.25f;
+
+            //  -----  Airborne Options  -----
+            [Tooltip("Actor turn speed while not moving."), Min(0)]
+            public float airTurnSpeedScale = 0.1f;
+            public AnimationCurve airborneMoveCurve = AnimationCurve.EaseInOut(0, 1, 1, 0);
+
+            //  -----  Other Options  -----
+            /// <summary> "Multiplier to ground speed when moving backwards.  </summary>
             [Tooltip("Multiplier to ground speed when moving backwards."), Range(0, 2)]
             public float backwardsMultiplier = 0.7f;
-            /// <summary>
-            /// Movement speed required to start movement.
-            /// </summary>
+            /// <summary> Movement speed required to start movement.  </summary>
             [Tooltip("Movement speed required to start movement."), Range(0, 0.8f)]
             public float moveThreshold = 0.2f;
         }
@@ -102,7 +63,15 @@ namespace JH.RootMotionController
         [Serializable]
         private class AnimationSettings
         {
-           
+            /// <summary> The minimum angle required to trigger a turnaround while the actor is moving.  </summary>
+            [Tooltip("The minimum angle required to trigger a turnaround while the actor is moving.")]
+            public float turnAroundAngle = 160f;
+            /// <summary> The minimum angle required to trigger a turnaround while the actor is stationary.  </summary>
+            [Tooltip("The minimum angle required to trigger a turnaround while the actor is stationary.")]
+            public float standingTurnAroundAngle = 89f;
+            /// <summary>#NOSUMMARY</summary>
+            [Tooltip("#NOTOOLTIP")]
+            public float maxFallSpeed = -100;
             [Tooltip("The name of the state that should be activated when the character is moving.")]
             public string moveStateName = "Movement";
             [Tooltip("The name of the state that should be activated when the character is airborne.")]
@@ -155,7 +124,7 @@ namespace JH.RootMotionController
             [Tooltip("Character capsule collider settings.")]
             public ColliderSettings colliderSettings = new ColliderSettings();
             [Tooltip("What layer to detect collisions.")]
-            public LayerMask collisionsMask;
+            public LayerMask collisionsMask = LayerMask.NameToLayer("Ground");
             //[Tooltip("Should character check for collisions in horizontal space.")]
             //public bool detectHorizontalCollisions = true;
             //[Tooltip("Should character check for collisions in vertical space.")]

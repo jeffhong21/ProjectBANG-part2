@@ -5,7 +5,7 @@ using UnityEngine;
 namespace JH.RootMotionController
 {
 
-    public enum LocomotionState
+    public enum MovementState
     {
         Standing = 0,
         Walking = 1,

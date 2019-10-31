@@ -8,8 +8,53 @@ namespace JH.RootMotionController
     [RequireComponent(typeof(Animator))]
     public partial class RootMotionController : MonoBehaviour
     {
+        private const float k_collisionOffset = 0.01f;
+        private readonly float k_wallAngle = 85f;
+        private readonly float k_gravity = -9.81f;
+
+        [Tooltip("Movement settings.")]
+        [SerializeField] private MovementSettings m_motor = new MovementSettings();
+        [Tooltip("Animation settings.")]
+        [SerializeField] private AnimationSettings m_animation = new AnimationSettings();
+        [Tooltip("Physics settings.")]
+        [SerializeField] private PhysicsSettings m_physics = new PhysicsSettings();
+        [Tooltip("Collision settings.")]
+        [SerializeField] private CollisionSettings m_collision = new CollisionSettings();
+        [Tooltip("Advanced settings.")]
+        [SerializeField] private AdvanceSettings m_advance = new AdvanceSettings();
+        [Tooltip("Debug settings.")]
+        [SerializeField] public DebugSettings debugMode = new DebugSettings();
+
+        private CollisionSettings.ColliderSettings m_collider { get { return m_collision.colliderSettings; } }
+
+        private Vector3 _gravity;
+        public Vector3 gravity{
+            get {
+                _gravity.Set(0, k_gravity * m_physics.gravityModifier, 0);
+                return _gravity;
+            }
+        }
 
 
+        /// <summary>
+        /// Returns movement settings turning speed as radians.
+        /// </summary>
+        private float rotationSpeed { get => m_motor.turningSpeed * Mathf.Deg2Rad; }
+
+        public float colliderRadius{
+            get { return m_actorCollider.radius * m_transform.lossyScale.x; }
+            set { m_actorCollider.radius = value * m_transform.lossyScale.x; }
+        }
+
+        public LayerMask collisionMask { get { return m_collision.collisionsMask; } }
+        public float deltaTime { get; private set; }
+        public Animator animator { get => m_animator; }
+        public CapsuleCollider actorCollider { get => m_actorCollider; }
+
+
+
+
+        private float m_spherecastRadius = 0.1f;
         private float m_deltaTime;
         private float m_fixedDeltaTime;
         private Animator m_animator;
@@ -17,14 +62,11 @@ namespace JH.RootMotionController
         private CapsuleCollider m_actorCollider;
         private GameObject m_gameObject;
         private Transform m_transform;
+        /// <summary>Make sure update is called once.</summary>
+        private bool frameUpdated;
 
-        public float deltaTime { get; private set; }
-        public Animator animator { get => m_animator; }
-        public CapsuleCollider actorCollider { get => m_actorCollider; }
-        public Vector3 position { get => m_transform.position; }
-        public Vector3 forward { get => m_transform.forward; }
-        public Vector3 up { get => m_transform.up; }
-        public Vector3 down { get => -m_transform.up; }
+
+
 
 
 
@@ -41,9 +83,7 @@ namespace JH.RootMotionController
             m_rigidbody.collisionDetectionMode = m_advance.collisionDetectionMode;
             m_rigidbody.isKinematic = m_advance.isKinematic;
             m_rigidbody.interpolation = m_advance.rigidbodyInterpolation;
-            m_rigidbody.constraints = m_rigidbody.isKinematic ?
-                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ :
-                                      RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY|    RigidbodyConstraints.FreezeRotationZ;
+            m_rigidbody.constraints = RigidbodyConstraints.FreezeRotation;
 
             //  Collider settings.
             m_actorCollider.center = m_collider.center;
@@ -71,28 +111,35 @@ namespace JH.RootMotionController
 
 
 
-
-        //private void UpdateLocomotion()
-        //{
-
-
-        //    //velocityVector = m_previousVelocity;
-        //    //m_previousVelocity = (m_animator.deltaPosition * m_motor.rootMotionScale) / m_deltaTime;
-        //    //m_previousVelocity = m_animator.velocity;
+        private void FixedUpdate()
+        {
+            UpdateMovement(m_fixedDeltaTime);
+            frameUpdated = true;
+        }
 
 
-        //    if (inputVector.sqrMagnitude > 1)
-        //        inputVector.Normalize();
-        //    m_inputMagnitude = inputVector.magnitude;
+        private void Update()
+        {
+            if (!frameUpdated) {
+                UpdateMovement(m_deltaTime);
+                frameUpdated = true;
+            }
+                
+        }
 
+        private void LateUpdate()
+        {
+            if (frameUpdated) {
+                frameUpdated = false;
+            }
+        }
 
-        //    //SetMovement();
-        //    //CheckGround();
-        //    //CheckMovement();
-        //    //UpdateRotation();
-        //    //UpdateMovement();
-        //    //UpdateAnimator();
-        //}
+        private void UpdateMovement(float time)
+        {
+            if (!isGrounded) m_airTime += time;
+            else m_airTime = 0;
+        }
+
 
 
 

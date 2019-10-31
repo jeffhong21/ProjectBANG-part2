@@ -9,20 +9,17 @@ namespace JH.RootMotionController
 
     public partial class RootMotionController
     {
-        private LocomotionState locomotionState = LocomotionState.Standing;
+        private MovementState locomotionState = MovementState.Standing;
 
         public bool isMoving;
         public bool isGrounded;
         public bool isStrafing;
 
+
+        [Header("--  Options  --")]
+        /// <summary>   </summary>
         [DebugDisplay(RichTextColor.Magenta)]
         public Vector3 inputVector;
-        ///// <summary>Direction of input vector.e</summary>
-        //[DebugDisplay(RichTextColor.Magenta)]
-        //public Vector3 inputDirection { get; private set; }
-
-
-
         /// <summary>   </summary>
         [DebugDisplay(RichTextColor.LightBlue)]
         public Vector3 moveDirection;
@@ -35,20 +32,20 @@ namespace JH.RootMotionController
         /// <summary>World Position on the last Frame.</summary>
         public Vector3 lastPosition { get; internal set; }
         /// <summary>Difference between the Current Rotation and the desire Input Rotation. </summary>
-        [DebugDisplay]
+        [DebugDisplay(RichTextColor.Magenta)]
         public float deltaAngle { get; internal set; }
         /// <summary>Total velocity of this frame.</summary>
         [DebugDisplay(RichTextColor.Green)]
         public Vector3 velocityVector { get; private set; }
-        [DebugDisplay(RichTextColor.Green)]
+        [DebugDisplay(RichTextColor.Magenta)]
         public float velocitySpeed { get; private set; }
         [DebugDisplay]
         public float maxMoveSpeed { get; private set; }
 
-        public bool moveWithDirection { get; private set; }
 
 
 
+        public float rootMotionScale { get { return m_motor.rootMotionScale; } }
         /// <summary>Normalized forward speed.</summary>
         public float normalizedForwardSpeed { get; private set; }
         /// <summary>Normalized forward speed.</summary>
@@ -65,8 +62,14 @@ namespace JH.RootMotionController
         public float surfaceSlope { get; private set; }
 
 
-
-
+        /// <summary>
+        /// Gets the ground or air cceleration from motor settings.
+        /// </summary>
+        private float acceleration{
+            get {
+                return m_motor.forwardAcceleration;
+            }
+        }
         private Vector3 m_verticalVelocity;
         private Vector3 m_targetDirection;
         private Quaternion m_targetRotation;
@@ -77,9 +80,10 @@ namespace JH.RootMotionController
 
 
 
-        public void SetLocomotionState(LocomotionState locomotion)
+        public void SetMovementState(MovementState locomotion)
         {
             locomotionState = locomotion;
+            maxMoveSpeed = Mathf.MoveTowards(maxMoveSpeed, Mathf.Clamp((int)locomotionState, 1, 5), deltaTime * 4);
         }
 
 
@@ -93,12 +97,6 @@ namespace JH.RootMotionController
             m_targetDirection = rotation * forward;
             m_targetDirection.y = 0;
             m_targetDirection.Normalize();
-            //if (isGrounded)
-            //    m_targetDirection = rotation * inputVector;
-            //m_targetDirection = inputVector;
-
-
-
         }
 
 
@@ -114,36 +112,29 @@ namespace JH.RootMotionController
 
             //  Get delta position.
             deltaTime = animatePhysics ? m_fixedDeltaTime : m_deltaTime;
-            deltaPosition = position - lastPosition;
-
+            //deltaPosition = position - lastPosition;
+            deltaPosition = m_animator.deltaPosition;
             //  Get deltaAngle.
             deltaAngle = 0;
-            if (isMoving) {
+            if (inputVector.sqrMagnitude > 0.2f) {
                 //  Find the difference between the current angle and the target angle in radians.
                 var currentAngle = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
                 var targetAngle = Mathf.Atan2(m_targetDirection.x, m_targetDirection.z) * Mathf.Rad2Deg;
                 deltaAngle = Mathf.DeltaAngle(currentAngle, targetAngle);
             }
 
-
-            if (deltaTime > 0 && deltaPosition != Vector3.zero) {
-                velocityVector = deltaPosition / deltaTime;
-                velocitySpeed = Vector3.ProjectOnPlane(velocityVector, -gravity).magnitude;
-            }
-            velocityVector = deltaPosition / deltaTime;
-            velocitySpeed = Vector3.ProjectOnPlane(velocityVector, -gravity).magnitude;
+            velocityVector = deltaPosition  / deltaTime;
+            velocitySpeed = Vector3.ProjectOnPlane(velocityVector, surfaceNormal).magnitude;
 
 
             //  -----
             Move();
 
-
-
             //  -----
             CheckGround();
 
-            //  -----
-            CheckMovement();
+            ////  -----
+            //CheckMovement();
 
 
             //  -----
@@ -151,7 +142,7 @@ namespace JH.RootMotionController
 
 
             //  -----
-            //UpdateMovement();
+            UpdateMovement();
 
 
             //  -----
@@ -171,24 +162,36 @@ namespace JH.RootMotionController
 
         public void Move()
         {
-
-
-            Vector3 moveVector = m_animator.deltaPosition * m_motor.rootMotionScale;
             //  Get move Direction.
             //moveDirection = m_transform.InverseTransformVector(inputVector);
-            float turnAmount = Mathf.Atan2(inputVector.x, inputVector.z);
-            float forwardAmount = Mathf.Abs(inputVector.z);
-            moveDirection.Set(turnAmount, m_animator.velocity.y, forwardAmount);
-            moveDirection = Quaternion.FromToRotation(up, m_targetDirection) * m_transform.InverseTransformDirection(moveDirection);
 
-            //moveDirection = moveVector + moveDirection;
+            //float turnAmount = Mathf.Atan2(inputVector.x, inputVector.z);
+            //float forwardAmount = Mathf.Abs(inputVector.z);
+            //Vector3 moveVector = new Vector3(turnAmount, m_rigidbody.velocity.y, forwardAmount);
+            //moveDirection = velocityVector + m_transform.InverseTransformDirection(moveVector);
+            //moveDirection = Quaternion.FromToRotation(m_transform.forward, m_targetDirection) * moveVector;
+            ////moveDirection = new Vector3(turnAmount, m_rigidbody.velocity.y, forwardAmount);
+            moveDirection = GetMovementVector() + velocityVector;
 
 
+            float currentSpeed = Vector3.Dot(moveDirection, forward);
+            //  Calculate drag
+            Vector3 drag = moveDirection * MathUtil.SmoothStop3(m_motor.moveDamping);
+            if (inputVector.sqrMagnitude > 0)
+                drag *= 1 - Vector3.Dot(forward, m_targetDirection.normalized);
+            if (drag.sqrMagnitude > moveDirection.sqrMagnitude)
+                moveDirection = Vector3.zero;
+            else
+                moveDirection -= drag;
+
+            //moveDirection = m_transform.TransformDirection(inputVector) * (m_motor.forwardAcceleration * deltaTime);
+            moveDirection += m_animator.deltaPosition * m_inputMagnitude;
+            if (moveDirection.sqrMagnitude > m_motor.maxSpeed * m_motor.maxSpeed)
+                moveDirection = moveDirection.normalized * currentSpeed;
 
 
             isMoving = inputVector.z > 0.1f;
-            locomotionState = isMoving ? LocomotionState.Walking : LocomotionState.Standing;
-            maxMoveSpeed = Mathf.MoveTowards(maxMoveSpeed, Mathf.Clamp((int)locomotionState, 1, 5), deltaTime * 4);
+            SetMovementState(isMoving ? MovementState.Walking : MovementState.Standing);
         }
 
 
@@ -199,32 +202,13 @@ namespace JH.RootMotionController
             bool groundDetected = false;
             float radius = m_spherecastRadius;
             float distance = radius + m_physics.skinWidth;
-            RaycastHit groundHit = new RaycastHit();
+            RaycastHit groundHit; // = new RaycastHit();
 
-            if (isGrounded)
-            {
-                if (SphereGroundCast(position, Vector3.down, radius, distance, out groundHit, true, null)) {
-                    groundHit.distance = Mathf.Max(0.0f, groundHit.distance - k_collisionOffset);
-                    groundDetected = true;
-                }
+            if (SphereGroundCast(position, Vector3.down, radius, distance, out groundHit, true, null)) {
+                groundHit.distance = Mathf.Max(0.0f, groundHit.distance - k_collisionOffset);
+                groundDetected = true;
+            }
 
-                if (!groundDetected) {
-                    radius = colliderRadius * 0.9f;
-                    if (SphereGroundCast(position, Vector3.down, radius, distance, out groundHit, true, null)) {
-                        groundHit.distance = Mathf.Max(0.0f, groundHit.distance - k_collisionOffset);
-                        groundDetected = true;
-                    }
-                }
-            }
-            else
-            {
-                radius = colliderRadius * 0.9f;
-                distance = 20;
-                if (SphereGroundCast(position, Vector3.down, radius, distance, out groundHit, true, forward )) {
-                    groundHit.distance = Mathf.Max(0.0f, groundHit.distance - k_collisionOffset);
-                    groundDetected = true;
-                }
-            }
 
 
 
@@ -235,12 +219,11 @@ namespace JH.RootMotionController
                 surfaceNormal = groundHit.normal;
                 //  If dot product is greater than zero, than we are going down slope.  If dot p is negative, we are going up.
                 surfaceSlope = Vector3.Dot(moveDirection, surfaceNormal) >= 0 ? -1 : 1;
-            }
-            else {
+            } else {
                 isGrounded = false;
                 surfaceAngle = 0;
-
             }
+
 
         }
 
@@ -255,10 +238,12 @@ namespace JH.RootMotionController
         private void UpdateRotation()
         {
 
+            if (isMoving) {
+                var targetAngle = m_transform.AngleFromForward(m_targetDirection);
+                Quaternion targetRotation = Quaternion.Euler(0, targetAngle * rotationSpeed * deltaTime, 0);
+                moveRotation = targetRotation * m_transform.rotation;
+            }
 
-            var targetAngle = m_transform.AngleFromForward(m_targetDirection);
-            Quaternion targetRotation = Quaternion.Euler(0, targetAngle * rotationSpeed * deltaTime, 0);
-            moveRotation = targetRotation;
 
 
         }
@@ -266,28 +251,32 @@ namespace JH.RootMotionController
 
         private void UpdateMovement()
         {
-            Vector3 velocity = m_animator.velocity;
-            //float smoothDamping = MathUtil.SmoothStop3(deltaTime);
-            Vector3 drag = velocity * (MathUtil.SmoothStop3(deltaTime));
-            if (inputVector.sqrMagnitude > 0)
-                drag *= 1 - Vector3.Dot(moveDirection.normalized, m_targetDirection.normalized);
-            if (drag.sqrMagnitude > velocity.sqrMagnitude)
-                velocity = Vector3.zero;
-            else
-                velocity -= drag;
 
-            moveDirection = velocity + moveDirection;
-            //velocity += m_animator.deltaPosition * m_inputMagnitude;
-            //if(velocity.sqrMagnitude > m_motor.maxSpeed)
 
-            //if (isGrounded) {
+            if (isGrounded)
+            {
+                float currentSpeed = Vector3.Dot(moveDirection, forward);
 
-            //}
+                //  Reorient move vector to the slope of the ground.
+                moveDirection = GetDirectionTangentToSurface(moveDirection, surfaceNormal);
+                // Reorient target velocity.
+                Vector3 right = Vector3.Cross(moveDirection, m_transform.up);
+                Vector3 targetVelocity = Vector3.Cross(surfaceNormal, right).normalized * currentSpeed;
+                moveDirection = Vector3.Lerp(targetVelocity, m_targetDirection, deltaTime * acceleration);
+                moveDirection.y = 0;
+            }
             //else {
-            //    //m_verticalVelocity += gravity * deltaTime;
+
+            //    m_verticalVelocity += -gravity * deltaTime;
+            //    var velocityY = Mathf.Min(m_verticalVelocity.y, m_physics.terminalVelocity) ;
+            //    m_verticalVelocity.y = velocityY;
+
+
+            //    moveDirection += m_verticalVelocity;
             //}
 
-            //velocityVector = moveDirection + velocityVector;
+
+
         }
 
 
@@ -302,20 +291,18 @@ namespace JH.RootMotionController
             if (!m_rigidbody.isKinematic) {
                 //m_rigidbody.velocity = Vector3.zero;
                 m_rigidbody.angularVelocity = Vector3.zero;
-
                 m_rigidbody.velocity = moveDirection;
 
-                //if (deltaTime > 0) {
-                //    m_rigidbody.velocity = velocityVector; // moveDirection / deltaTime;
-                //}
+                float moveScale = Vector3.Dot(moveDirection, forward);
+                moveDirection.y = 0;
+                m_rigidbody.velocity = Vector3.Slerp(m_rigidbody.velocity, moveDirection, deltaTime * acceleration);
+
+
             }
-            //else {
-            //    m_rigidbody.position += moveDirection;
-            //}
 
 
             //m_rigidbody.rotation *= moveRotation;
-            m_rigidbody.MoveRotation(moveRotation * m_transform.rotation);
+            m_rigidbody.MoveRotation(moveRotation);
 
 
             ////m_rigidbody.angularVelocity = Vector3.Lerp(m_rigidbody.angularVelocity, angularVelocity, rotationSpeed * deltaTime);
@@ -367,11 +354,11 @@ namespace JH.RootMotionController
         //}
 
 
-        //public Vector3 GetMovementVector()
-        //{
-        //    var moveVector = m_animator.deltaPosition * m_motor.rootMotionScale;
-        //    return moveVector;
-        //}
+        public Vector3 GetMovementVector()
+        {
+            var moveVector = m_animator.deltaPosition * m_motor.rootMotionScale;
+            return moveVector;
+        }
 
         //public float GetRotationAngle()
         //{
@@ -389,6 +376,7 @@ namespace JH.RootMotionController
         //}
 
 
+
         public bool SphereGroundCast(Vector3 currentPosition, Vector3 direction, float radius, float distance, out RaycastHit hit, bool useSkinWidth = false, Vector3? positionOffset = null)
         {
             float skinWidth = useSkinWidth ? m_physics.skinWidth : 0;
@@ -402,10 +390,33 @@ namespace JH.RootMotionController
         }
 
 
+        public Vector3 GetDirectionTangentToSurface(Vector3 direction, Vector3 surfaceNormal)
+        {
+            float scale = direction.magnitude;
+            Vector3 temp = Vector3.Cross(surfaceNormal, direction);
+            Vector3 tangent = Vector3.Cross(temp, surfaceNormal);
+            tangent = tangent.normalized * scale;
+            return tangent;
+        }
 
 
 
 
+        private bool ClimbSlope(ref Vector3 velocity, float moveAmount, float slopeAngle)
+        {
+            //  Climb slope.
+            float directionY = Mathf.Sin(slopeAngle * Mathf.Deg2Rad) * colliderRadius;
+            if (velocity.y <= directionY)
+            {
+                velocity.y = directionY;
+                moveAmount = Mathf.Cos(slopeAngle * Mathf.Deg2Rad) * colliderRadius;
+                velocity = velocity.normalized * moveAmount;
+
+
+                return true;
+            }
+            return false;
+        }
 
     }
 }
